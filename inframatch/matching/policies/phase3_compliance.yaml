@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "aggregate": {
+    "strategy": "weighted_average"
+  },
+  "rules": [
+    {
+      "id": "local_content",
+      "type": "threshold_ratio",
+      "weight": 1.0,
+      "enabled": true,
+      "supplier_field": "local_content_score",
+      "opportunity_field": "required_local_content",
+      "pass_when_requirement_missing": true,
+      "messages": {
+        "missing_requirement": "No minimum local content requirement.",
+        "template": "Supplier local content {actual:.2f} vs required {required:.2f}."
+      }
+    },
+    {
+      "id": "small_business",
+      "type": "boolean_requirement",
+      "weight": 1.0,
+      "enabled": true,
+      "supplier_field": "small_business_flag",
+      "opportunity_field": "requires_small_business",
+      "messages": {
+        "missing_requirement": "No small-business set-aside requirement.",
+        "pass": "Supplier satisfies the small-business requirement.",
+        "fail": "Supplier does not satisfy the small-business requirement."
+      }
+    },
+    {
+      "id": "certifications",
+      "type": "subset_ratio",
+      "weight": 1.0,
+      "enabled": true,
+      "supplier_field": "certifications_json",
+      "opportunity_field": "required_certifications_json",
+      "messages": {
+        "missing_requirement": "No required certifications.",
+        "pass_template": "Matched all required certifications: {matched_csv}.",
+        "fail_template": "Missing certifications: {missing_csv}."
+      }
+    }
+  ]
+}

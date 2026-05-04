@@ -4,3 +4,4 @@ pyarrow
 tqdm
 pytest
 sqlmodel
+PyYAML
