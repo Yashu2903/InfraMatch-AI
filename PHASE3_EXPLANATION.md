@@ -56,7 +56,7 @@ It contains:
 - final weighted score assembly
 - explanation text for each factor
 
-### `inframatch/matching/compliance.py`
+### `inframatch/compliance/engine.py`
 
 This is the compliance policy engine.
 
@@ -69,7 +69,7 @@ It:
   - a single compliance score
   - detailed rule outcomes
 
-### `inframatch/matching/policies/phase3_compliance.yaml`
+### `inframatch/compliance/rules.yaml`
 
 This file defines the compliance rules.
 
@@ -648,34 +648,39 @@ Why:
 - partial credit is useful
 
 
-## 12. Why the Compliance Rules Currently Have Equal Weights
+## 12. Why the Compliance Rules Use `0.4 / 0.3 / 0.3`
 
-Inside the policy file, the three rules currently use weight `1.0` each.
+Inside the current rules file, the three rules use:
 
-That means compliance currently behaves like an equal-weight average of:
+- `local_content`: `0.4`
+- `small_business`: `0.3`
+- `certifications`: `0.3`
 
-- local content
-- small business
-- certifications
+That means compliance is still blended, but not evenly.
 
-Why this was done:
+Why this weighting makes sense:
 
-- simple and interpretable baseline
-- avoids pretending we already know a more precise business hierarchy
-- keeps the first policy version easy to tune
+- `local_content` gets the largest share because it is a direct numeric
+  project-delivery constraint
+- `small_business` remains important, but only activates when the opportunity
+  actually requires it
+- `certifications` matter, but they sit slightly below local-content fit in the
+  current hierarchy
 
-Why equal weighting makes sense for now:
+Why this is better than equal weighting here:
 
-- all three requirements are meaningful
-- the project is still at a stage where transparency matters more than overfit
-  precision
+- it reflects a clearer business priority
+- it still stays simple enough to explain
+- it avoids making compliance depend too heavily on binary set-aside status
+  alone
 
 What this means practically:
 
-- if a supplier passes two rules and fails one, compliance still remains partly
-  positive
-- if later business logic says one rule is much more important, we can change
-  only the policy file
+- a supplier can still recover part of its compliance score through partial
+  local-content or certification fit
+- the biggest compliance lift comes from satisfying local-content requirements
+- if the business wants to retune this later, it can still be changed in the
+  rules file without rewriting scoring code
 
 
 ## 13. Why We Added a Separate Entrant Model

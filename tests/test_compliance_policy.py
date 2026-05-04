@@ -1,22 +1,21 @@
 from datetime import date
 from types import SimpleNamespace
 
-from inframatch.matching.compliance import evaluate_compliance_policy, load_compliance_policy
+from inframatch.compliance.engine import evaluate_rules, load_rules
 
 
-def test_load_compliance_policy_has_expected_rules():
-    policy = load_compliance_policy()
+def test_load_rules_has_expected_rules():
+    rules = load_rules()
 
-    assert policy["version"] == 1
-    assert policy["aggregate"]["strategy"] == "weighted_average"
-    assert [rule["id"] for rule in policy["rules"]] == [
+    assert [rule["id"] for rule in rules] == [
         "local_content",
         "small_business",
         "certifications",
     ]
+    assert [rule["weight"] for rule in rules] == [0.4, 0.3, 0.3]
 
 
-def test_evaluate_compliance_policy_returns_weighted_outcomes():
+def test_evaluate_rules_returns_weighted_outcomes():
     supplier = SimpleNamespace(
         id=1,
         canonical_name="Policy Test Supplier",
@@ -36,10 +35,10 @@ def test_evaluate_compliance_policy_returns_weighted_outcomes():
         required_certifications_json='["PE_License", "Bridge_Inspection_NHI"]',
     )
 
-    score, outcomes = evaluate_compliance_policy(supplier, opportunity)
-    by_rule = {item["rule"]: item for item in outcomes}
+    score, outcomes = evaluate_rules(supplier, opportunity)
+    by_rule = {item["rule_id"]: item for item in outcomes}
 
-    assert round(score, 4) == round((0.5 + 0.0 + 0.5) / 3, 4)
-    assert by_rule["local_content"]["score"] == 0.5
+    assert round(score, 4) == round((0.5 * 0.4) + (0.0 * 0.3) + (0.5 * 0.3), 4)
+    assert by_rule["local_content"]["partial_score"] == 0.5
     assert by_rule["small_business"]["passed"] is False
     assert by_rule["certifications"]["missing"] == ["Bridge_Inspection_NHI"]

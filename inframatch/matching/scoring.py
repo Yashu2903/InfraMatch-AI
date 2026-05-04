@@ -3,7 +3,7 @@ import math
 from datetime import date
 from typing import Any
 
-from inframatch.matching.compliance import evaluate_compliance_policy
+from inframatch.compliance.engine import evaluate_rules
 
 CORRIDOR_STATES = {"CT", "DE", "MA", "MD", "NJ", "NY", "PA"}
 
@@ -320,11 +320,36 @@ def recency_score(last_award_date) -> float:
     years = years_since(last_award_date)
     return math.exp(-0.35 * years)
 
+
+def normalize_compliance_outcomes(outcomes: list[dict]) -> list[dict]:
+    normalized = []
+
+    for item in outcomes:
+        normalized.append(
+            {
+                "rule": item.get("rule_id"),
+                "name": item.get("name"),
+                "rule_type": item.get("type"),
+                "passed": bool(item.get("passed", False)),
+                "score": round(float(item.get("partial_score", 0.0)), 4),
+                "weight": round(float(item.get("weight", 0.0)), 4),
+                "weighted_score": round(float(item.get("weighted_score", 0.0)), 4),
+                "note": item.get("message", ""),
+                "supplier_value": item.get("supplier_value"),
+                "required_value": item.get("required_value"),
+                "missing": item.get("missing", []),
+            }
+        )
+
+    return normalized
+
+
 def compliance_fit(supplier, opportunity) -> tuple[float, list[dict]]:
     """
     Phase 3 compliance policy evaluation.
     """
-    return evaluate_compliance_policy(supplier, opportunity)
+    score, outcomes = evaluate_rules(supplier, opportunity)
+    return score, normalize_compliance_outcomes(outcomes)
 
 
 def compliance_fit_stub(supplier, opportunity) -> float:
@@ -403,6 +428,51 @@ def factor_note(
     return ""
 
 
+def build_concerns(
+    breakdown: list[dict],
+    compliance_outcomes: list[dict],
+    weights: dict[str, float],
+) -> list[dict]:
+    factor_concerns = [
+        item
+        for item in breakdown
+        if item["value"] is not None and item["factor"] != "compliance_fit"
+    ]
+
+    compliance_weight = float(weights.get("compliance_fit", 0.0))
+    compliance_concerns = []
+
+    for outcome in compliance_outcomes:
+        if outcome["passed"]:
+            continue
+
+        compliance_concerns.append(
+            {
+                "factor": f"compliance:{outcome['rule']}",
+                "value": round(float(outcome["score"]), 4),
+                "weight": round(compliance_weight * float(outcome["weight"]), 4),
+                "weighted_score": round(
+                    compliance_weight * float(outcome["weighted_score"]),
+                    4,
+                ),
+                "note": outcome["note"],
+            }
+        )
+
+    compliance_concerns = sorted(
+        compliance_concerns,
+        key=lambda item: (item["value"], item["weighted_score"]),
+    )
+    factor_concerns = sorted(
+        factor_concerns,
+        key=lambda item: (item["value"], item["weighted_score"]),
+    )
+
+    combined = compliance_concerns + factor_concerns
+
+    return combined[:3]
+
+
 def score_supplier(
     supplier,
     opportunity,
@@ -477,10 +547,7 @@ def score_supplier(
         reverse=True,
     )[:3]
 
-    concerns = sorted(
-        [item for item in breakdown if item["value"] is not None],
-        key=lambda item: item["value"],
-    )[:3]
+    concerns = build_concerns(breakdown, compliance_outcomes, weights)
 
     return {
         "supplier_id": supplier.id,

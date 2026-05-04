@@ -190,3 +190,6 @@ def test_score_supplier_surfaces_failed_compliance_checks():
         for item in result["score_breakdown"]
         if item["factor"] == "compliance_fit"
     )
+    concern_factors = {item["factor"] for item in result["concerns"]}
+    assert "compliance:small_business" in concern_factors
+    assert "compliance:certifications" in concern_factors

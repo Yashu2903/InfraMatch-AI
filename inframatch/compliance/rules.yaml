@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "id": "local_content",
+      "name": "Local Content Threshold",
+      "type": "numeric_threshold",
+      "field": "local_content_score",
+      "operator": ">=",
+      "source": "opportunity.required_local_content",
+      "weight": 0.4
+    },
+    {
+      "id": "small_business",
+      "name": "Small Business Set-Aside",
+      "type": "boolean_match",
+      "field": "small_business_flag",
+      "required_when": "opportunity.requires_small_business",
+      "weight": 0.3
+    },
+    {
+      "id": "certifications",
+      "name": "Required Certifications",
+      "type": "set_subset",
+      "field": "certifications",
+      "required": "opportunity.required_certifications",
+      "weight": 0.3
+    }
+  ]
+}
