@@ -5,3 +5,13 @@ tqdm
 pytest
 sqlmodel
 PyYAML
+torch
+torchvision
+scikit-learn
+pillow
+opencv-python
+matplotlib
+numpy
+fastapi
+uvicorn
+python-multipart
