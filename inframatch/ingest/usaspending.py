@@ -1,7 +1,5 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
-import threading
 import time
 from datetime import date
 from pathlib import Path
@@ -13,41 +11,23 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 
-BASE_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
-TRANSACTION_SEARCH_URL = "https://api.usaspending.gov/api/v2/search/spending_by_transaction/"
-AWARD_DETAILS_URL = "https://api.usaspending.gov/api/v2/awards/{award_id}/"
-_THREAD_LOCAL = threading.local()
+BASE_URL = "https://api.usaspending.gov/api/v2/search/spending_by_transaction/"
 
 
 DEFAULT_FIELDS = [
     "Award ID",
     "Recipient Name",
     "Recipient UEI",
-    "Award Amount",
-    "Start Date",
-    "End Date",
+    "Action Date",
+    "Transaction Amount",
     "Awarding Agency",
     "Awarding Sub Agency",
+    "Recipient Location",
+    "Primary Place of Performance",
     "NAICS Code",
     "NAICS Description",
-    "Recipient Location",
-]
-
-TRANSACTION_FIELDS = [
-    "internal_id",
-    "Award ID",
-    "Recipient Name",
-    "Recipient UEI",
-    "Action Date",
-    "Awarding Agency",
-    "Awarding Sub Agency",
-    "Transaction Amount",
-    "product_or_service_code",
-    "product_or_service_description",
-    "naics_code",
-    "naics_description",
-    "Primary Place of Performance",
-    "Recipient Location",
+    "PSC Code",
+    "PSC Description",
 ]
 
 
@@ -68,16 +48,6 @@ def _build_session() -> requests.Session:
     return session
 
 
-def _get_thread_session() -> requests.Session:
-    session = getattr(_THREAD_LOCAL, "session", None)
-
-    if session is None:
-        session = _build_session()
-        _THREAD_LOCAL.session = session
-
-    return session
-
-
 def _supports_api_naics_filter(naics_prefixes: list[str]) -> bool:
     return all(len(str(code).strip()) in {2, 4, 6} for code in naics_prefixes)
 
@@ -88,21 +58,6 @@ def _format_api_naics_filter(naics_prefixes: list[str] | None) -> list[str] | No
 
     if _supports_api_naics_filter(naics_prefixes):
         return [str(code).strip() for code in naics_prefixes if str(code).strip()]
-
-    coarse_prefixes = _coarse_api_naics_prefixes(naics_prefixes)
-
-    if not coarse_prefixes:
-        return None
-
-    return coarse_prefixes
-
-
-def _coarse_api_naics_prefixes(naics_prefixes: list[str]) -> list[str] | None:
-    if not naics_prefixes:
-        return None
-
-    if _supports_api_naics_filter(naics_prefixes):
-        return naics_prefixes
 
     coarse_prefixes = []
 
@@ -118,53 +73,15 @@ def _coarse_api_naics_prefixes(naics_prefixes: list[str]) -> list[str] | None:
     return coarse_prefixes or None
 
 
-def _fetch_award_details(award_id: int | str, cache_dir: Path) -> dict:
-    cache_path = cache_dir / f"{award_id}.json"
-
-    if cache_path.exists():
-        with cache_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-
-    session = _get_thread_session()
-    response = session.get(AWARD_DETAILS_URL.format(award_id=award_id), timeout=60)
-
-    try:
-        response.raise_for_status()
-    except HTTPError as exc:
-        response_text = response.text.strip()
-        raise HTTPError(
-            f"{exc}. Response body: {response_text}",
-            response=response,
-            request=response.request,
-        ) from exc
-
-    response_json = response.json()
-
-    with cache_path.open("w", encoding="utf-8") as f:
-        json.dump(response_json, f, indent=2)
-
-    return response_json
-
-
-def _extract_naics_from_award_details(award_details: dict) -> tuple[str | None, str | None]:
-    latest_transaction_contract_data = award_details.get("latest_transaction_contract_data") or {}
-    naics_code = latest_transaction_contract_data.get("naics")
-    naics_description = latest_transaction_contract_data.get("naics_description")
-
-    if naics_code is not None:
-        naics_code = str(naics_code).strip() or None
-
-    if naics_description is not None:
-        naics_description = str(naics_description).strip() or None
-
-    return naics_code, naics_description
-
-
 def _matches_naics_prefixes(row: dict, naics_prefixes: list[str]) -> bool:
     if not naics_prefixes:
         return True
 
-    naics_code = str(row.get("NAICS Code") or "").strip()
+    naics_code = str(
+        row.get("NAICS Code")
+        or row.get("naics_code")
+        or ""
+    ).strip()
 
     return any(naics_code.startswith(prefix) for prefix in naics_prefixes)
 
@@ -175,19 +92,37 @@ def _needs_client_side_naics_filter(
     return bool(requested_naics_prefixes) and requested_naics_prefixes != (api_naics_prefixes or [])
 
 
-def _build_agency_filters(agency_names: list[str] | None) -> list[dict] | None:
-    if not agency_names:
-        return None
-
-    return [
-        {
-            "type": "awarding",
-            "tier": "toptier",
-            "toptier_name": agency_name,
-            "name": agency_name,
-        }
-        for agency_name in agency_names
+def _legacy_cache_dir(cache_dir: Path) -> Path | None:
+    candidates = [
+        path
+        for path in cache_dir.iterdir()
+        if path.is_dir() and (path / "page_1.json").exists()
     ]
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    return None
+
+
+def _first_present(row: dict, *keys: str):
+    for key in keys:
+        value = row.get(key)
+
+        if value is not None and value != "":
+            return value
+
+    return None
+
+
+def _coerce_amount(value) -> float:
+    if value is None or value == "":
+        return 0.0
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def build_filter_payload(
@@ -202,15 +137,7 @@ def build_filter_payload(
     limit: int = 100,
 ) -> dict:
     """
-    Build USAspending Advanced Search payload.
-
-    Phase 1 bounded slice:
-    - states: Northeast corridor place-of-performance states
-    - civilian top-tier agencies relevant to infrastructure work
-    - infrastructure-oriented PSC codes
-    - optional NAICS backstop
-    - award types: C, D
-    - min amount: 25,000
+    Build USAspending transaction-search payload for the bounded infrastructure slice.
     """
     filters = {
         "time_period": [
@@ -220,7 +147,6 @@ def build_filter_payload(
                 "date_type": "new_awards_only",
             }
         ],
-        "place_of_performance_scope": "domestic",
         "place_of_performance_locations": [
             {
                 "country": "USA",
@@ -236,33 +162,38 @@ def build_filter_payload(
         ],
     }
 
+    if psc_codes:
+        filters["psc_codes"] = {
+            "require": [str(code).strip() for code in psc_codes if str(code).strip()],
+        }
+
+    if agency_names:
+        filters["agencies"] = [
+            {
+                "type": "awarding",
+                "tier": "toptier",
+                "name": agency_name,
+            }
+            for agency_name in agency_names
+            if str(agency_name).strip()
+        ]
+
     if naics_prefixes:
         filters["naics_codes"] = {
             "require": naics_prefixes,
         }
 
-    if psc_codes:
-        filters["psc_codes"] = psc_codes
-
-    agencies = _build_agency_filters(agency_names)
-
-    if agencies:
-        filters["agencies"] = agencies
-
     return {
-        "filters": {
-            **filters,
-        },
+        "filters": filters,
         "fields": DEFAULT_FIELDS,
         "page": page,
         "limit": limit,
-        "sort": "Award Amount",
+        "sort": "Transaction Amount",
         "order": "desc",
-        "subawards": False,
     }
 
 
-def fetch_awards(
+def fetch_award_transactions(
     states: list[str] | None = None,
     naics_prefixes: list[str] | None = None,
     psc_codes: list[str] | None = None,
@@ -270,28 +201,32 @@ def fetch_awards(
     start_date: str = "2020-01-01",
     end_date: str | None = None,
     min_amount: float = 25_000,
-    cache_dir: str | Path = "data/raw/usaspending",
+    cache_dir: str | Path = "data/raw/usaspending_transactions",
     limit: int = 100,
     max_pages: int | None = None,
     sleep_seconds: float = 0.2,
 ) -> Iterable[dict]:
     """
-    Fetch paginated USAspending award records.
-
-    Caches each page locally so reruns are resumable and the demo can work offline.
+    Fetch paginated USAspending transaction records with cache reuse.
     """
     states = states or ["NJ", "NY", "PA"]
-    naics_prefixes = naics_prefixes or ["541", "237"]
+    psc_codes = psc_codes or []
+    agency_names = agency_names or []
     end_date = end_date or date.today().isoformat()
-    api_naics_prefixes = _format_api_naics_filter(naics_prefixes)
+
+    requested_naics_prefixes = naics_prefixes or []
+    api_naics_prefixes = _format_api_naics_filter(requested_naics_prefixes)
     needs_client_side_naics_filter = _needs_client_side_naics_filter(
-        naics_prefixes, api_naics_prefixes
+        requested_naics_prefixes,
+        api_naics_prefixes,
     )
 
-    cache_dir = Path(cache_dir)
+    cache_root = Path(cache_dir)
+    cache_root.mkdir(parents=True, exist_ok=True)
+
     cache_key_payload = {
         "states": states,
-        "naics_prefixes": naics_prefixes,
+        "naics_prefixes": requested_naics_prefixes,
         "psc_codes": psc_codes,
         "agency_names": agency_names,
         "start_date": start_date,
@@ -303,17 +238,25 @@ def fetch_awards(
     cache_key = hashlib.sha1(
         json.dumps(cache_key_payload, sort_keys=True).encode("utf-8")
     ).hexdigest()[:12]
-    cache_dir = cache_dir / cache_key
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    session = _build_session()
+    request_cache_dir = cache_root / cache_key
+    legacy_cache_dir = _legacy_cache_dir(cache_root)
 
+    if request_cache_dir.exists():
+        active_cache_dir = request_cache_dir
+    elif legacy_cache_dir is not None:
+        active_cache_dir = legacy_cache_dir
+    else:
+        request_cache_dir.mkdir(parents=True, exist_ok=True)
+        active_cache_dir = request_cache_dir
+
+    session = _build_session()
     page = 1
 
     while True:
         if max_pages is not None and page > max_pages:
             break
 
-        cache_path = cache_dir / f"page_{page}.json"
+        cache_path = active_cache_dir / f"page_{page}.json"
 
         if cache_path.exists():
             with cache_path.open("r", encoding="utf-8") as f:
@@ -344,10 +287,12 @@ def fetch_awards(
                 ) from exc
 
             response_json = response.json()
+            request_cache_dir.mkdir(parents=True, exist_ok=True)
 
-            with cache_path.open("w", encoding="utf-8") as f:
+            with (request_cache_dir / f"page_{page}.json").open("w", encoding="utf-8") as f:
                 json.dump(response_json, f, indent=2)
 
+            active_cache_dir = request_cache_dir
             time.sleep(sleep_seconds)
 
         results = response_json.get("results", [])
@@ -356,7 +301,10 @@ def fetch_awards(
             break
 
         for row in results:
-            if needs_client_side_naics_filter and not _matches_naics_prefixes(row, naics_prefixes):
+            if needs_client_side_naics_filter and not _matches_naics_prefixes(
+                row,
+                requested_naics_prefixes,
+            ):
                 continue
 
             yield row
@@ -370,11 +318,95 @@ def fetch_awards(
         page += 1
 
 
-def fetch_award_transactions(
+def collapse_transactions_to_awards(rows: list[dict]) -> list[dict]:
+    """
+    Collapse transaction-level rows into one row per award.
+    """
+    awards: dict[str, dict] = {}
+
+    for row in rows:
+        award_id = _first_present(row, "Award ID")
+
+        if award_id is None:
+            continue
+
+        award_id = str(award_id).strip()
+
+        if not award_id:
+            continue
+
+        award = awards.setdefault(
+            award_id,
+            {
+                "Award ID": award_id,
+                "Recipient Name": _first_present(row, "Recipient Name"),
+                "Recipient UEI": _first_present(row, "Recipient UEI"),
+                "Award Amount": 0.0,
+                "Start Date": None,
+                "End Date": _first_present(row, "End Date"),
+                "Awarding Agency": _first_present(row, "Awarding Agency"),
+                "Awarding Sub Agency": _first_present(row, "Awarding Sub Agency"),
+                "NAICS Code": _first_present(row, "NAICS Code", "naics_code"),
+                "NAICS Description": _first_present(
+                    row,
+                    "NAICS Description",
+                    "naics_description",
+                ),
+                "PSC Code": _first_present(row, "PSC Code", "product_or_service_code"),
+                "PSC Description": _first_present(
+                    row,
+                    "PSC Description",
+                    "product_or_service_description",
+                ),
+                "Recipient Location": _first_present(row, "Recipient Location"),
+                "Primary Place of Performance": _first_present(
+                    row,
+                    "Primary Place of Performance",
+                ),
+                "internal_id": _first_present(row, "internal_id"),
+            },
+        )
+
+        award["Award Amount"] += _coerce_amount(
+            _first_present(row, "Transaction Amount", "Award Amount")
+        )
+
+        action_date = _first_present(row, "Action Date", "Start Date")
+
+        if action_date and (
+            award["Start Date"] is None or str(action_date) > str(award["Start Date"])
+        ):
+            award["Start Date"] = action_date
+
+        for target_key, source_keys in [
+            ("Recipient Name", ("Recipient Name",)),
+            ("Recipient UEI", ("Recipient UEI",)),
+            ("End Date", ("End Date",)),
+            ("Awarding Agency", ("Awarding Agency",)),
+            ("Awarding Sub Agency", ("Awarding Sub Agency",)),
+            ("NAICS Code", ("NAICS Code", "naics_code")),
+            ("NAICS Description", ("NAICS Description", "naics_description")),
+            ("PSC Code", ("PSC Code", "product_or_service_code")),
+            (
+                "PSC Description",
+                ("PSC Description", "product_or_service_description"),
+            ),
+            ("Recipient Location", ("Recipient Location",)),
+            ("Primary Place of Performance", ("Primary Place of Performance",)),
+            ("internal_id", ("internal_id",)),
+        ]:
+            if award[target_key] is None or award[target_key] == "":
+                replacement = _first_present(row, *source_keys)
+
+                if replacement is not None and replacement != "":
+                    award[target_key] = replacement
+
+    return list(awards.values())
+
+
+def fetch_awards(
     states: list[str] | None = None,
     naics_prefixes: list[str] | None = None,
-    psc_codes: list[str] | None = None,
-    agency_names: list[str] | None = None,
     start_date: str = "2020-01-01",
     end_date: str | None = None,
     min_amount: float = 25_000,
@@ -384,229 +416,16 @@ def fetch_award_transactions(
     sleep_seconds: float = 0.2,
 ) -> Iterable[dict]:
     """
-    Fetch paginated USAspending transaction records.
-
-    This endpoint returns populated naics_code fields for contract transactions,
-    which makes it a better Phase 1 source than spending_by_award for supplier
-    feature construction.
+    Backward-compatible alias retained for older callers.
     """
-    states = states or ["NJ", "NY", "PA"]
-    end_date = end_date or date.today().isoformat()
-    api_naics_prefixes = _format_api_naics_filter(naics_prefixes)
-    needs_client_side_naics_filter = _needs_client_side_naics_filter(
-        naics_prefixes, api_naics_prefixes
+    yield from fetch_award_transactions(
+        states=states,
+        naics_prefixes=naics_prefixes,
+        start_date=start_date,
+        end_date=end_date,
+        min_amount=min_amount,
+        cache_dir=cache_dir,
+        limit=limit,
+        max_pages=max_pages,
+        sleep_seconds=sleep_seconds,
     )
-
-    cache_dir = Path(cache_dir)
-    cache_key_payload = {
-        "states": states,
-        "naics_prefixes": naics_prefixes,
-        "psc_codes": psc_codes,
-        "agency_names": agency_names,
-        "start_date": start_date,
-        "end_date": end_date,
-        "min_amount": min_amount,
-        "limit": limit,
-        "api_naics_prefixes": api_naics_prefixes,
-        "endpoint": "transactions",
-    }
-    cache_key = hashlib.sha1(
-        json.dumps(cache_key_payload, sort_keys=True).encode("utf-8")
-    ).hexdigest()[:12]
-    cache_dir = cache_dir / cache_key
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    session = _build_session()
-
-    page = 1
-
-    while True:
-        if max_pages is not None and page > max_pages:
-            break
-
-        cache_path = cache_dir / f"page_{page}.json"
-
-        if cache_path.exists():
-            with cache_path.open("r", encoding="utf-8") as f:
-                response_json = json.load(f)
-        else:
-            payload = build_filter_payload(
-                states=states,
-                naics_prefixes=api_naics_prefixes,
-                psc_codes=psc_codes,
-                agency_names=agency_names,
-                start_date=start_date,
-                end_date=end_date,
-                min_amount=min_amount,
-                page=page,
-                limit=limit,
-            )
-            payload["fields"] = TRANSACTION_FIELDS
-            payload["sort"] = "Transaction Amount"
-
-            response = session.post(TRANSACTION_SEARCH_URL, json=payload, timeout=60)
-
-            try:
-                response.raise_for_status()
-            except HTTPError as exc:
-                response_text = response.text.strip()
-                raise HTTPError(
-                    f"{exc}. Response body: {response_text}",
-                    response=response,
-                    request=response.request,
-                ) from exc
-
-            response_json = response.json()
-
-            with cache_path.open("w", encoding="utf-8") as f:
-                json.dump(response_json, f, indent=2)
-
-            time.sleep(sleep_seconds)
-
-        results = response_json.get("results", [])
-
-        if not results:
-            break
-
-        for row in results:
-            if needs_client_side_naics_filter and not str(row.get("naics_code") or "").startswith(tuple(naics_prefixes)):
-                continue
-
-            yield row
-
-        page_metadata = response_json.get("page_metadata", {})
-        has_next_page = page_metadata.get("hasNext") or page_metadata.get("has_next_page")
-
-        if not has_next_page:
-            break
-
-        page += 1
-
-
-def collapse_transactions_to_awards(transaction_rows: list[dict]) -> list[dict]:
-    """
-    Convert transaction-level search results into one row per award.
-    """
-    awards_by_id = {}
-
-    for row in transaction_rows:
-        award_id = row.get("Award ID")
-
-        if not award_id:
-            continue
-
-        award = awards_by_id.setdefault(
-            award_id,
-            {
-                "internal_id": row.get("internal_id"),
-                "Award ID": award_id,
-                "Recipient Name": row.get("Recipient Name"),
-                "Recipient UEI": row.get("Recipient UEI"),
-                "Award Amount": 0,
-                "Start Date": row.get("Action Date"),
-                "End Date": None,
-                "Awarding Agency": row.get("Awarding Agency"),
-                "Awarding Sub Agency": row.get("Awarding Sub Agency"),
-                "NAICS Code": row.get("naics_code"),
-                "NAICS Description": row.get("naics_description"),
-                "PSC Code": row.get("product_or_service_code"),
-                "PSC Description": row.get("product_or_service_description"),
-                "Primary Place of Performance": row.get("Primary Place of Performance"),
-                "Recipient Location": row.get("Recipient Location"),
-            },
-        )
-
-        transaction_amount = row.get("Transaction Amount") or 0
-        award["Award Amount"] += float(transaction_amount)
-
-        action_date = row.get("Action Date")
-
-        if action_date and (not award["Start Date"] or action_date > award["Start Date"]):
-            award["Start Date"] = action_date
-
-        if not award.get("Recipient Name") and row.get("Recipient Name"):
-            award["Recipient Name"] = row.get("Recipient Name")
-
-        if not award.get("Recipient UEI") and row.get("Recipient UEI"):
-            award["Recipient UEI"] = row.get("Recipient UEI")
-
-        if not award.get("Awarding Agency") and row.get("Awarding Agency"):
-            award["Awarding Agency"] = row.get("Awarding Agency")
-
-        if not award.get("Awarding Sub Agency") and row.get("Awarding Sub Agency"):
-            award["Awarding Sub Agency"] = row.get("Awarding Sub Agency")
-
-        if not award.get("NAICS Code") and row.get("naics_code"):
-            award["NAICS Code"] = row.get("naics_code")
-
-        if not award.get("NAICS Description") and row.get("naics_description"):
-            award["NAICS Description"] = row.get("naics_description")
-
-        if not award.get("PSC Code") and row.get("product_or_service_code"):
-            award["PSC Code"] = row.get("product_or_service_code")
-
-        if not award.get("PSC Description") and row.get("product_or_service_description"):
-            award["PSC Description"] = row.get("product_or_service_description")
-
-        if not award.get("Primary Place of Performance") and row.get("Primary Place of Performance"):
-            award["Primary Place of Performance"] = row.get("Primary Place of Performance")
-
-        if not award.get("Recipient Location") and row.get("Recipient Location"):
-            award["Recipient Location"] = row.get("Recipient Location")
-
-    return list(awards_by_id.values())
-
-
-def enrich_awards_with_naics(
-    rows: list[dict],
-    cache_dir: str | Path = "data/raw/usaspending/award_details",
-    max_workers: int = 2,
-) -> list[dict]:
-    """
-    Fill in missing NAICS data from the per-award details endpoint.
-    """
-    cache_dir = Path(cache_dir)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    missing_award_ids = sorted(
-        {
-            row.get("internal_id")
-            for row in rows
-            if row.get("internal_id") and not row.get("NAICS Code")
-        }
-    )
-
-    if not missing_award_ids:
-        return rows
-
-    naics_by_award_id = {}
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_award_id = {
-            executor.submit(_fetch_award_details, award_id, cache_dir): award_id
-            for award_id in missing_award_ids
-        }
-
-        for future in as_completed(future_to_award_id):
-            award_id = future_to_award_id[future]
-            try:
-                award_details = future.result()
-            except Exception:
-                continue
-
-            naics_by_award_id[award_id] = _extract_naics_from_award_details(award_details)
-
-    for row in rows:
-        award_id = row.get("internal_id")
-
-        if not award_id or row.get("NAICS Code"):
-            continue
-
-        naics_code, naics_description = naics_by_award_id.get(award_id, (None, None))
-
-        if naics_code:
-            row["NAICS Code"] = naics_code
-
-        if naics_description:
-            row["NAICS Description"] = naics_description
-
-    return rows

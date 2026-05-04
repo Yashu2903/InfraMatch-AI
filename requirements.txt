@@ -3,3 +3,4 @@ requests
 pyarrow
 tqdm
 pytest
+sqlmodel

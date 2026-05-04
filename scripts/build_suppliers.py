@@ -62,22 +62,30 @@ def extract_state(recipient_location):
 
 
 def normalize_award_row(row: dict) -> dict:
-    location = row.get("Recipient Location")
-    place_of_performance = row.get("Primary Place of Performance")
+    location = row.get("Recipient Location") or row.get("recipient_location")
+    place_of_performance = (
+        row.get("Primary Place of Performance")
+        or row.get("place_of_performance")
+    )
 
     return {
         "award_id": row.get("Award ID"),
         "recipient_name": row.get("Recipient Name"),
         "recipient_uei": row.get("Recipient UEI"),
-        "award_amount": pd.to_numeric(row.get("Award Amount"), errors="coerce"),
-        "start_date": row.get("Start Date"),
+        "award_amount": pd.to_numeric(
+            row.get("Award Amount", row.get("Transaction Amount")),
+            errors="coerce",
+        ),
+        "start_date": row.get("Start Date") or row.get("Action Date"),
         "end_date": row.get("End Date"),
         "awarding_agency": row.get("Awarding Agency"),
         "awarding_subagency": row.get("Awarding Sub Agency"),
-        "naics_code": str(row.get("NAICS Code") or "").strip(),
-        "naics_description": row.get("NAICS Description"),
-        "psc_code": str(row.get("PSC Code") or "").strip(),
-        "psc_description": row.get("PSC Description"),
+        "naics_code": str(row.get("NAICS Code") or row.get("naics_code") or "").strip(),
+        "naics_description": row.get("NAICS Description") or row.get("naics_description"),
+        "psc_code": str(
+            row.get("PSC Code") or row.get("product_or_service_code") or ""
+        ).strip(),
+        "psc_description": row.get("PSC Description") or row.get("product_or_service_description"),
         "recipient_location": location,
         "recipient_state": extract_state(location),
         "place_of_performance": place_of_performance,
