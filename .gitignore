@@ -5,6 +5,7 @@ data/sdnet/
 data/sdnet_splits/
 models/
 outputs/
+uploads/
 *.db
 __pycache__/
 *.pyc

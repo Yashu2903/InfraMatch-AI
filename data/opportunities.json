@@ -1,0 +1,270 @@
+[
+  {
+    "title": "Newark Culvert Inspection and Repair",
+    "asset_type": "culvert",
+    "state": "NJ",
+    "city": "Newark",
+    "naics_code": "237310",
+    "psc_code": "Z1LB",
+    "awarding_agency": "General Services Administration",
+    "awarding_subagency": "Public Buildings Service",
+    "budget": 31117.09,
+    "required_local_content": 69.63,
+    "requires_small_business": true,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "OSHA_30"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "New York Facade Structural Inspection",
+    "asset_type": "facade",
+    "state": "NY",
+    "city": "New York",
+    "naics_code": "541330",
+    "psc_code": "C211",
+    "awarding_agency": "General Services Administration",
+    "awarding_subagency": "Public Buildings Service",
+    "budget": 297136.28,
+    "required_local_content": 36.78,
+    "requires_small_business": false,
+    "required_certifications": [
+      "ISO_9001",
+      "PE_License"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "Baltimore Pavement Rehabilitation Assessment",
+    "asset_type": "pavement",
+    "state": "MD",
+    "city": "Baltimore",
+    "naics_code": "541330",
+    "psc_code": "Y1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Highway Administration",
+    "budget": 80584.62,
+    "required_local_content": 53.46,
+    "requires_small_business": false,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "ISO_9001",
+      "PE_License"
+    ],
+    "risk_tolerance": "medium"
+  },
+  {
+    "title": "Edison Pavement Rehabilitation Assessment",
+    "asset_type": "pavement",
+    "state": "NJ",
+    "city": "Edison",
+    "naics_code": "237310",
+    "psc_code": "Y1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Railroad Administration",
+    "budget": 69674.75,
+    "required_local_content": 65.15,
+    "requires_small_business": true,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "OSHA_30"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "Baltimore Retaining Wall Condition Assessment",
+    "asset_type": "retaining_wall",
+    "state": "MD",
+    "city": "Baltimore",
+    "naics_code": "237310",
+    "psc_code": "C211",
+    "awarding_agency": "General Services Administration",
+    "awarding_subagency": "Public Buildings Service",
+    "budget": 191774.24,
+    "required_local_content": 55.21,
+    "requires_small_business": false,
+    "required_certifications": [
+      "OSHA_30"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "Philadelphia Culvert Inspection and Repair",
+    "asset_type": "culvert",
+    "state": "PA",
+    "city": "Philadelphia",
+    "naics_code": "237310",
+    "psc_code": "Z1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Highway Administration",
+    "budget": 57785.4,
+    "required_local_content": 58.49,
+    "requires_small_business": true,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "OSHA_30"
+    ],
+    "risk_tolerance": "high"
+  },
+  {
+    "title": "Camden Bridge Deck Inspection",
+    "asset_type": "bridge_deck",
+    "state": "NJ",
+    "city": "Camden",
+    "naics_code": "541330",
+    "psc_code": "C1LB",
+    "awarding_agency": "Department of the Interior",
+    "awarding_subagency": "National Park Service",
+    "budget": 957496.2,
+    "required_local_content": 22.65,
+    "requires_small_business": false,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "PE_License"
+    ],
+    "risk_tolerance": "high"
+  },
+  {
+    "title": "Erie Pavement Rehabilitation Assessment",
+    "asset_type": "pavement",
+    "state": "PA",
+    "city": "Erie",
+    "naics_code": "541330",
+    "psc_code": "Z1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Highway Administration",
+    "budget": 99171.83,
+    "required_local_content": 62.45,
+    "requires_small_business": true,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "PE_License"
+    ],
+    "risk_tolerance": "high"
+  },
+  {
+    "title": "Philadelphia Retaining Wall Condition Assessment",
+    "asset_type": "retaining_wall",
+    "state": "PA",
+    "city": "Philadelphia",
+    "naics_code": "237310",
+    "psc_code": "C211",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Highway Administration",
+    "budget": 159798.21,
+    "required_local_content": 46.11,
+    "requires_small_business": false,
+    "required_certifications": [
+      "OSHA_30"
+    ],
+    "risk_tolerance": "high"
+  },
+  {
+    "title": "Buffalo Pavement Rehabilitation Assessment",
+    "asset_type": "pavement",
+    "state": "NY",
+    "city": "Buffalo",
+    "naics_code": "541330",
+    "psc_code": "C211",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Transit Administration",
+    "budget": 307153.29,
+    "required_local_content": 48.83,
+    "requires_small_business": true,
+    "required_certifications": [
+      "PE_License"
+    ],
+    "risk_tolerance": "medium"
+  },
+  {
+    "title": "Annapolis Culvert Inspection and Repair",
+    "asset_type": "culvert",
+    "state": "MD",
+    "city": "Annapolis",
+    "naics_code": "541350",
+    "psc_code": "Z1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Highway Administration",
+    "budget": 50937.23,
+    "required_local_content": 75.03,
+    "requires_small_business": false,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "PE_License"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "Newark Culvert Inspection and Repair",
+    "asset_type": "culvert",
+    "state": "NJ",
+    "city": "Newark",
+    "naics_code": "237310",
+    "psc_code": "Z1LB",
+    "awarding_agency": "Department of the Interior",
+    "awarding_subagency": "National Park Service",
+    "budget": 44943.36,
+    "required_local_content": 78.14,
+    "requires_small_business": true,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "OSHA_30"
+    ],
+    "risk_tolerance": "high"
+  },
+  {
+    "title": "Philadelphia Culvert Inspection and Repair",
+    "asset_type": "culvert",
+    "state": "PA",
+    "city": "Philadelphia",
+    "naics_code": "541350",
+    "psc_code": "Z1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Highway Administration",
+    "budget": 27377.96,
+    "required_local_content": 77.88,
+    "requires_small_business": false,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "PE_License"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "Dover Retaining Wall Condition Assessment",
+    "asset_type": "retaining_wall",
+    "state": "DE",
+    "city": "Dover",
+    "naics_code": "541330",
+    "psc_code": "Z1LB",
+    "awarding_agency": "Department of Transportation",
+    "awarding_subagency": "Federal Railroad Administration",
+    "budget": 95571.35,
+    "required_local_content": 50.6,
+    "requires_small_business": true,
+    "required_certifications": [
+      "Bridge_Inspection_NHI",
+      "PE_License"
+    ],
+    "risk_tolerance": "low"
+  },
+  {
+    "title": "Stamford Retaining Wall Condition Assessment",
+    "asset_type": "retaining_wall",
+    "state": "CT",
+    "city": "Stamford",
+    "naics_code": "237310",
+    "psc_code": "C219",
+    "awarding_agency": "General Services Administration",
+    "awarding_subagency": "Public Buildings Service",
+    "budget": 247787.55,
+    "required_local_content": 57.52,
+    "requires_small_business": true,
+    "required_certifications": [
+      "ISO_9001",
+      "OSHA_30"
+    ],
+    "risk_tolerance": "low"
+  }
+]
