@@ -319,6 +319,16 @@ def get_supplier(supplier_id: int):
     return supplier_to_response(supplier)
 
 
+@app.get("/inspections", response_model=list[InspectionResponse])
+def list_inspections():
+    with Session(engine) as session:
+        inspections = session.exec(
+            select(Inspection).order_by(Inspection.created_at.desc())
+        ).all()
+
+    return [inspection_to_response(item) for item in inspections]
+
+
 @app.post("/opportunities/{opportunity_id}/assign", response_model=InspectionResponse)
 def assign_supplier(opportunity_id: int, payload: AssignSupplierRequest):
     with Session(engine) as session:
