@@ -15,3 +15,7 @@ numpy
 fastapi
 uvicorn
 python-multipart
+streamlit
+requests
+pandas
+plotly
